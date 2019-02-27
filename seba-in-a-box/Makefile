@@ -172,12 +172,20 @@ $(M)/ponsim: | $(M)/voltha
 
 $(M)/pon0_fwd: | $(M)/ponsim
 	echo 8 > /tmp/pon0_group_fwd_mask
+	echo 8 > /tmp/pon2_group_fwd_mask
 	until sudo cp /tmp/pon0_group_fwd_mask /sys/class/net/pon0/bridge/group_fwd_mask; \
 	do \
 		echo "waiting for pon0..."; \
 		sleep 5; \
 	done
+	until sudo cp /tmp/pon2_group_fwd_mask /sys/class/net/pon2/bridge/group_fwd_mask; \
+	do \
+		echo "waiting for pon2..."; \
+		sleep 5; \
+	done
 	rm /tmp/pon0_group_fwd_mask
+	rm /tmp/pon2_group_fwd_mask
+
 	touch $@
 
 $(M)/mininet: | $(M)/onos $(M)/ponsim $(M)/pon0_fwd
@@ -216,7 +224,7 @@ $(M)/siab: | $(M)/voltha-running $(M)/mininet $(M)/ponsim-tosca
 	http -a karaf:karaf --ignore-stdin POST http://127.0.0.1:30120/onos/v1/configuration/org.opencord.olt.impl.Olt defaultVlan=65535
 	timeout 1m bash -c "until http GET http://127.0.0.1:30125/health|jq '.state'|grep -q HEALTHY; do echo 'Waiting for VOLTHA to be HEALTHY'; sleep 10; done"
 	echo "[passed] VOLTHA is HEALTHY"
-	timeout 2m bash -c "until http GET http://127.0.0.1:30125/api/v1/devices|jq '.items[].admin_state'|grep ENABLED|wc -l|grep -q 2; do echo 'Waiting for OLT and ONU to be enabled in VOLTHA'; sleep 10; done"
+	timeout 2m bash -c "until http GET http://127.0.0.1:30125/api/v1/devices|jq '.items[].admin_state'|grep ENABLED|wc -l|grep -q 3; do echo 'Waiting for OLT and ONU to be enabled in VOLTHA'; sleep 10; done"
 	echo "[passed] OLT and ONU are enabled in VOLTHA"
 	timeout 2m bash -c "until http -a karaf:karaf GET http://127.0.0.1:30120/onos/v1/devices|jq '.devices[].available'|grep true|wc -l|grep -q 2; do echo 'Waiting for VOLTHA logical device and agg switch to be available in ONOS'; sleep 10; done"
 	echo "[passed] VOLTHA logical device and agg switch are available in ONOS"
@@ -297,4 +305,5 @@ reset-kubeadm: remove-chart-milestones remove-kube-milestones remove-test-milest
 	sudo iptables -F && sudo iptables -t nat -F && sudo iptables -t mangle -F && sudo iptables -X
 	sudo rm -f /var/lib/cni/networks/pon0/* || true
 	sudo rm -f /var/lib/cni/networks/pon1/* || true
+	sudo rm -f /var/lib/cni/networks/pon2/* || true
 	sudo rm -f /var/lib/cni/networks/k8s-pod-network/* || true
